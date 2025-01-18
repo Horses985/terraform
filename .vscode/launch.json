@@ -13,3 +13,460 @@
         }
     ]
 }
+I'll implement the additional features to create a more complete application.
+
+
+
+```javascript
+// App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { OrderProvider } from './context/OrderContext';
+import { SocketProvider } from './context/SocketContext';
+import { PaymentProvider } from './context/PaymentContext';
+import Navbar from './components/Navbar';
+import Dashboard from './components/Dashboard';
+import DeliveryForm from './components/DeliveryForm';
+import Profile from './components/Profile';
+import TrackingPage from './components/TrackingPage';
+import Login from './components/auth/Login';
+import Register from './components/auth/Register';
+import BusinessDashboard from './components/business/BusinessDashboard';
+import DriverDashboard from './components/driver/DriverDashboard';
+import AdminPanel from './components/admin/AdminPanel';
+import PaymentSettings from './components/payment/PaymentSettings';
+
+const PrivateRoute = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? children : <Navigate to="/login" />;
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <SocketProvider>
+        <OrderProvider>
+          <PaymentProvider>
+            <Router>
+              <div className="min-h-screen bg-gray-100">
+                <Navbar />
+                <div className="container mx-auto px-4 py-8">
+                  <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/" element={
+                      <PrivateRoute>
+                        <Dashboard />
+                      </PrivateRoute>
+                    } />
+                    <Route path="/new-delivery" element={
+                      <PrivateRoute>
+                        <DeliveryForm />
+                      </PrivateRoute>
+                    } />
+                    <Route path="/profile" element={
+                      <PrivateRoute>
+                        <Profile />
+                      </PrivateRoute>
+                    } />
+                    <Route path="/track/:orderId" element={
+                      <PrivateRoute>
+                        <TrackingPage />
+                      </PrivateRoute>
+                    } />
+                    <Route path="/business/*" element={
+                      <PrivateRoute>
+                        <BusinessDashboard />
+                      </PrivateRoute>
+                    } />
+                    <Route path="/driver/*" element={
+                      <PrivateRoute>
+                        <DriverDashboard />
+                      </PrivateRoute>
+                    } />
+                    <Route path="/admin/*" element={
+                      <PrivateRoute>
+                        <AdminPanel />
+                      </PrivateRoute>
+                    } />
+                    <Route path="/payment-settings" element={
+                      <PrivateRoute>
+                        <PaymentSettings />
+                      </PrivateRoute>
+                    } />
+                  </Routes>
+                </div>
+              </div>
+            </Router>
+          </PaymentProvider>
+        </OrderProvider>
+      </SocketProvider>
+    </AuthProvider>
+  );
+};
+
+// context/AuthContext.js
+import { createContext, useContext, useState, useEffect } from 'react';
+import api from '../services/api';
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const response = await api.get('/auth/verify');
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      localStorage.removeItem('token');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (credentials) => {
+    const response = await api.post('/auth/login', credentials);
+    const { token, user } = response.data;
+    localStorage.setItem('token', token);
+    setUser(user);
+    setIsAuthenticated(true);
+    return user;
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout }}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
+
+// context/SocketContext.js
+import { createContext, useContext, useEffect, useRef } from 'react';
+import io from 'socket.io-client';
+
+const SocketContext = createContext();
+
+export const SocketProvider = ({ children }) => {
+  const socket = useRef();
+
+  useEffect(() => {
+    socket.current = io(process.env.REACT_APP_WEBSOCKET_URL, {
+      auth: { token: localStorage.getItem('token') }
+    });
+
+    return () => {
+      if (socket.current) {
+        socket.current.disconnect();
+      }
+    };
+  }, []);
+
+  return (
+    <SocketContext.Provider value={socket.current}>
+      {children}
+    </SocketContext.Provider>
+  );
+};
+
+export const useSocket = () => useContext(SocketContext);
+
+// components/auth/Login.js
+const Login = () => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(formData);
+      navigate('/');
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto bg-white rounded-lg shadow p-6">
+      <h2 className="text-2xl font-bold mb-6">Login</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block mb-2">Email</label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
+        <div>
+          <label className="block mb-2">Password</label>
+          <input
+            type="password"
+            value={formData.password}
+            onChange={(e) => setFormData({...formData, password: e.target.value})}
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+        >
+          Login
+        </button>
+      </form>
+    </div>
+  );
+};
+
+// components/business/BusinessDashboard.js
+const BusinessDashboard = () => {
+  const [orders, setOrders] = useState([]);
+  const [analytics, setAnalytics] = useState({});
+  const { user } = useAuth();
+  const socket = useSocket();
+
+  useEffect(() => {
+    loadOrders();
+    loadAnalytics();
+
+    socket.current.on('orderUpdate', handleOrderUpdate);
+    return () => socket.current.off('orderUpdate', handleOrderUpdate);
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      const response = await api.get('/business/orders');
+      setOrders(response.data);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+    }
+  };
+
+  const loadAnalytics = async () => {
+    try {
+      const response = await api.get('/business/analytics');
+      setAnalytics(response.data);
+    } catch (error) {
+      console.error('Failed to load analytics:', error);
+    }
+  };
+
+  const handleOrderUpdate = (updatedOrder) => {
+    setOrders(prevOrders =>
+      prevOrders.map(order =>
+        order.id === updatedOrder.id ? updatedOrder : order
+      )
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="font-semibold mb-2">Total Orders</h3>
+          <p className="text-2xl">{analytics.totalOrders}</p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="font-semibold mb-2">Active Deliveries</h3>
+          <p className="text-2xl">{analytics.activeDeliveries}</p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="font-semibold mb-2">Monthly Spending</h3>
+          <p className="text-2xl">${analytics.monthlySpending}</p>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b">
+          <h2 className="text-xl font-semibold">Recent Orders</h2>
+        </div>
+        <div className="p-4">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="text-left">Order ID</th>
+                <th className="text-left">Status</th>
+                <th className="text-left">Driver</th>
+                <th className="text-left">Delivery Time</th>
+                <th className="text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(order => (
+                <tr key={order.id}>
+                  <td>{order.id}</td>
+                  <td>{order.status}</td>
+                  <td>{order.driver?.name || 'Unassigned'}</td>
+                  <td>{order.estimatedDelivery}</td>
+                  <td>
+                    <Link
+                      to={`/track/${order.id}`}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Track
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// components/driver/DriverDashboard.js
+const DriverDashboard = () => {
+  const [activeDeliveries, setActiveDeliveries] = useState([]);
+  const [availability, setAvailability] = useState(false);
+  const { user } = useAuth();
+  const socket = useSocket();
+
+  useEffect(() => {
+    loadActiveDeliveries();
+    
+    socket.current.on('newDelivery', handleNewDelivery);
+    socket.current.on('deliveryUpdate', handleDeliveryUpdate);
+    
+    return () => {
+      socket.current.off('newDelivery', handleNewDelivery);
+      socket.current.off('deliveryUpdate', handleDeliveryUpdate);
+    };
+  }, []);
+
+  const loadActiveDeliveries = async () => {
+    try {
+      const response = await api.get('/driver/active-deliveries');
+      setActiveDeliveries(response.data);
+    } catch (error) {
+      console.error('Failed to load deliveries:', error);
+    }
+  };
+
+  const toggleAvailability = async () => {
+    try {
+      const response = await api.post('/driver/toggle-availability', {
+        available: !availability
+      });
+      setAvailability(response.data.available);
+    } catch (error) {
+      console.error('Failed to toggle availability:', error);
+    }
+  };
+
+  const updateDeliveryStatus = async (deliveryId, status) => {
+    try {
+      await api.put(`/driver/delivery/${deliveryId}/status`, { status });
+      loadActiveDeliveries();
+    } catch (error) {
+      console.error('Failed to update delivery status:', error);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Driver Dashboard</h2>
+        <button
+          onClick={toggleAvailability}
+          className={`px-4 py-2 rounded ${
+            availability ? 'bg-green-600' : 'bg-red-600'
+          } text-white`}
+        >
+          {availability ? 'Available' : 'Unavailable'}
+        </button>
+      </div>
+
+      <div className="grid gap-4">
+        {activeDeliveries.map(delivery => (
+          <div key={delivery.id} className="bg-white p-4 rounded-lg shadow">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-semibold">Delivery #{delivery.id}</h3>
+                <p className="text-gray-600">Pickup: {delivery.pickupAddress}</p>
+                <p className="text-gray-600">Delivery: {delivery.deliveryAddress}</p>
+                <p className="text-gray-600">
+                  Package Size: {delivery.packageSize}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => updateDeliveryStatus(delivery.id, 'picked-up')}
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded"
+                >
+                  Mark as Picked Up
+                </button>
+                <button
+                  onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
+                  className="w-full bg-green-600 text-white px-4 py-2 rounded"
+                >
+                  Mark as Delivered
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// components/admin/AdminPanel.js
+const AdminPanel = () => {
+  const [users, setUsers] = useState([]);
+  const [deliveries, setDeliveries] = useState([]);
+  const [stats, setStats] = useState({});
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
+
+  const loadAdminData = async () => {
+    try {
+      const [usersResponse, deliveriesResponse, statsResponse] = await Promise.all([
+        api.get('/admin/users'),
+        api.get('/admin/deliveries'),
+        api.get('/admin/stats')
+      ]);
+
+      setUsers(usersResponse.data);
+      setDeliveries(deliveriesResponse.data);
+      setStats(statsResponse.data);
+    } catch (error) {
+      console.error('Failed to load admin data:', error);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="font-semibold mb-2">Total Users</h3>
+```
