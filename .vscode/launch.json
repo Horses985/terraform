@@ -13,7 +13,274 @@
         }
     ]
 }
-I'll implement the additional features to create a more complete application.
+// App.js
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import Dashboard from './components/Dashboard';
+import DeliveryForm from './components/DeliveryForm';
+import Profile from './components/Profile';
+import TrackingPage from './components/TrackingPage';
+import { OrderProvider } from './context/OrderContext';
+
+const App = () => {
+  return (
+    <OrderProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-100">
+          <Navbar />
+          <div className="container mx-auto px-4 py-8">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/new-delivery" element={<DeliveryForm />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/track/:orderId" element={<TrackingPage />} />
+            </Routes>
+          </div>
+        </div>
+      </Router>
+    </OrderProvider>
+  );
+};
+
+// components/Navbar.js
+const Navbar = () => {
+  return (
+    <nav className="bg-blue-600 text-white shadow-lg">
+      <div className="container mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="text-xl font-bold">TripleE Canada</div>
+          <div className="space-x-4">
+            <Link to="/" className="hover:text-blue-200">Dashboard</Link>
+            <Link to="/new-delivery" className="hover:text-blue-200">New Delivery</Link>
+            <Link to="/profile" className="hover:text-blue-200">Profile</Link>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+// components/DeliveryForm.js
+const DeliveryForm = () => {
+  const [formData, setFormData] = useState({
+    pickupAddress: '',
+    deliveryAddress: '',
+    packageSize: 'small',
+    serviceType: 'standard',
+    specialInstructions: ''
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Handle delivery request submission
+    console.log('Delivery request submitted:', formData);
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
+      <h2 className="text-2xl font-bold mb-6">New Delivery Request</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block mb-2">Pickup Address</label>
+          <input
+            type="text"
+            value={formData.pickupAddress}
+            onChange={(e) => setFormData({...formData, pickupAddress: e.target.value})}
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
+        <div>
+          <label className="block mb-2">Delivery Address</label>
+          <input
+            type="text"
+            value={formData.deliveryAddress}
+            onChange={(e) => setFormData({...formData, deliveryAddress: e.target.value})}
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
+        <div>
+          <label className="block mb-2">Package Size</label>
+          <select
+            value={formData.packageSize}
+            onChange={(e) => setFormData({...formData, packageSize: e.target.value})}
+            className="w-full p-2 border rounded"
+          >
+            <option value="small">Small (under 5kg)</option>
+            <option value="medium">Medium (up to 20kg)</option>
+            <option value="large">Large (over 20kg)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block mb-2">Service Type</label>
+          <select
+            value={formData.serviceType}
+            onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
+            className="w-full p-2 border rounded"
+          >
+            <option value="standard">Standard Delivery</option>
+            <option value="express">Express Delivery</option>
+            <option value="same-day">Same Day Delivery</option>
+          </select>
+        </div>
+        <div>
+          <label className="block mb-2">Special Instructions</label>
+          <textarea
+            value={formData.specialInstructions}
+            onChange={(e) => setFormData({...formData, specialInstructions: e.target.value})}
+            className="w-full p-2 border rounded"
+            rows="3"
+          />
+        </div>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+        >
+          Submit Delivery Request
+        </button>
+      </form>
+    </div>
+  );
+};
+
+// components/Dashboard.js
+const Dashboard = () => {
+  const [activeDeliveries, setActiveDeliveries] = useState([
+    {
+      id: '1',
+      status: 'in-transit',
+      pickupAddress: '123 Main St',
+      deliveryAddress: '456 Oak Ave',
+      estimatedDelivery: '2:30 PM'
+    },
+    // Add more mock deliveries as needed
+  ]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Active Deliveries</h2>
+        <Link
+          to="/new-delivery"
+          className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+        >
+          New Delivery
+        </Link>
+      </div>
+      <div className="grid gap-4">
+        {activeDeliveries.map(delivery => (
+          <div
+            key={delivery.id}
+            className="bg-white p-4 rounded-lg shadow"
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold">Delivery #{delivery.id}</h3>
+                <p className="text-gray-600">From: {delivery.pickupAddress}</p>
+                <p className="text-gray-600">To: {delivery.deliveryAddress}</p>
+              </div>
+              <div className="text-right">
+                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  {delivery.status}
+                </span>
+                <p className="text-sm mt-2">
+                  Est. Delivery: {delivery.estimatedDelivery}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// components/TrackingPage.js
+const TrackingPage = () => {
+  const { orderId } = useParams();
+  const [trackingData, setTrackingData] = useState({
+    status: 'in-transit',
+    currentLocation: 'Edmonton Downtown',
+    updates: [
+      {
+        time: '14:30',
+        status: 'Package picked up',
+        location: 'Warehouse A'
+      },
+      {
+        time: '15:15',
+        status: 'In transit',
+        location: 'Edmonton Downtown'
+      }
+    ]
+  });
+
+  return (
+    <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
+      <h2 className="text-2xl font-bold mb-6">Tracking Order #{orderId}</h2>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <span className="text-lg font-semibold">Current Status:</span>
+          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded">
+            {trackingData.status}
+          </span>
+        </div>
+        <p className="text-gray-600 mt-2">
+          Current Location: {trackingData.currentLocation}
+        </p>
+      </div>
+      <div className="space-y-4">
+        {trackingData.updates.map((update, index) => (
+          <div key={index} className="border-l-2 border-blue-500 pl-4 py-2">
+            <div className="font-semibold">{update.time}</div>
+            <div>{update.status}</div>
+            <div className="text-gray-600 text-sm">{update.location}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// context/OrderContext.js
+import { createContext, useContext, useReducer } from 'react';
+
+const OrderContext = createContext();
+
+const orderReducer = (state, action) => {
+  switch (action.type) {
+    case 'ADD_ORDER':
+      return [...state, action.payload];
+    case 'UPDATE_ORDER':
+      return state.map(order => 
+        order.id === action.payload.id ? { ...order, ...action.payload } : order
+      );
+    default:
+      return state;
+  }
+};
+
+export const OrderProvider = ({ children }) => {
+  const [orders, dispatch] = useReducer(orderReducer, []);
+
+  return (
+    <OrderContext.Provider value={{ orders, dispatch }}>
+      {children}
+    </OrderContext.Provider>
+  );
+};
+
+export const useOrders = () => {
+  const context = useContext(OrderContext);
+  if (!context) {
+    throw new Error('useOrders must be used within an OrderProvider');
+  }
+  return context;
+};
+
+export default App;
 
 
 
